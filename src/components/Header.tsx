@@ -3,8 +3,6 @@ import { type StaggeredMenuItem } from "./StaggeredMenu";
 interface HeaderProps {
 	items: StaggeredMenuItem[];
 	logoUrl: string;
-	statusLabel: string;
-	updatesAvailable: number;
 }
 
 export default function Header({
@@ -12,7 +10,7 @@ export default function Header({
 	logoUrl,
 }: HeaderProps) {
 	return (
-		<div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-6 rounded-full border border-white/10 bg-black/50 px-6 py-3 backdrop-blur-md shadow-lg shadow-black/20">
+		<div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-6 rounded-full border border-white/10 bg-black/20 px-6 py-3 backdrop-blur-md shadow-lg shadow-black/10">
 			<a href="/" className="flex items-center gap-2 transition-opacity hover:opacity-80">
 				<img 
 					src={logoUrl || "/logo192.png"} 

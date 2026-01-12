@@ -11,8 +11,5 @@ model App {
   name        String
   description String
   icon        String
-  version     String
-  size        String
-  status      String   @default("Installed")
-  installedAt DateTime @default(now())
+  url         String
 }
