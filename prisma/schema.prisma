@@ -1,0 +1,18 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model App {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String
+  icon        String
+  version     String
+  size        String
+  status      String   @default("Installed")
+  installedAt DateTime @default(now())
+}

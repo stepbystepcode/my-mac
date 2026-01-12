@@ -1,0 +1,22 @@
+{
+  "projectName": "my-mac",
+  "mode": "file-router",
+  "typescript": true,
+  "tailwind": true,
+  "packageManager": "bun",
+  "addOnOptions": {
+    "prisma": {
+      "database": "sqlite"
+    }
+  },
+  "git": true,
+  "version": 1,
+  "framework": "react-cra",
+  "chosenAddOns": [
+    "biome",
+    "shadcn",
+    "compiler",
+    "prisma",
+    "start"
+  ]
+}
