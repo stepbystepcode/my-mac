@@ -1,84 +1,89 @@
-import { gsap } from "gsap";
 import { CheckCircle2, Download, RefreshCw, Zap } from "lucide-react";
-import { useEffect, useRef } from "react";
-import type { App } from "@prisma/client";
-import { SpotlightCard } from "./SpotlightCard";
+import AnimatedContent from "./AnimatedContent";
+import SpotlightCard from "./SpotlightCard";
 
-export function StackList({ apps }: { apps: App[] }) {
-	const containerRef = useRef<HTMLDivElement>(null);
+export interface AppCard {
+	id: number;
+	name: string;
+	description: string;
+	icon: string;
+	version: string;
+	size: string;
+	status: string;
+}
 
-	useEffect(() => {
-		const ctx = gsap.context(() => {
-			gsap.from(".app-card", {
-				y: 50,
-				opacity: 0,
-				duration: 0.8,
-				stagger: 0.1,
-				ease: "power3.out",
-			});
-		}, containerRef);
-		return () => ctx.revert();
-	}, []);
-
+export function StackList({ apps }: { apps: AppCard[] }) {
 	return (
-		<div
-			ref={containerRef}
-			className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto pb-20"
-		>
-			{apps.map((app) => (
-				<SpotlightCard
-					key={app.id}
-					className="app-card group p-6 backdrop-blur-xl hover:scale-[1.02] transition-transform duration-300"
-				>
-					<div className="flex items-center gap-5">
-						<div className="relative w-16 h-16 shrink-0">
-							<div className="absolute inset-0 bg-gradient-to-br from-gray-700 to-gray-900 rounded-xl shadow-inner border border-white/5" />
-							<div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-xl">
-								{app.icon ? (
-									<img
-										src={app.icon}
-										alt={app.name}
-										className="w-full h-full object-cover"
-									/>
-								) : (
-									<Zap className="w-8 h-8 text-gray-400" />
-								)}
-							</div>
-						</div>
+		<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+			{apps.map((app) => {
+				const isUpdateAvailable = app.status === "Update Available";
+				const actionLabel = isUpdateAvailable ? "Update" : "Open";
+				const ActionIcon = isUpdateAvailable ? RefreshCw : Download;
+				const actionClasses = isUpdateAvailable
+					? "border-amber-400/30 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20"
+					: "border-emerald-400/30 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/20";
 
-						<div className="flex-1 min-w-0 flex flex-col justify-center h-full">
-							<div className="flex items-center justify-between">
-								<h3 className="text-xl font-bold text-white tracking-tight group-hover:text-cyan-400 transition-colors">
-									{app.name}
-								</h3>
-								<div className="flex items-center gap-2">
-									<StatusBadge status={app.status} />
+				return (
+					<AnimatedContent
+						key={app.id}
+						distance={30}
+						duration={0.6}
+						className="app-card"
+					>
+						<SpotlightCard
+						>
+							<article className="flex h-full w-full flex-col justify-between gap-6 p-6">
+								<div className="flex items-start gap-4">
+									<div className="relative h-14 w-14 shrink-0">
+										<div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/15 to-white/5 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]" />
+										<div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-2xl">
+											{app.icon ? (
+												<img
+													src={app.icon}
+													alt={app.name}
+													className="h-full w-full object-cover"
+												/>
+											) : (
+												<Zap className="h-7 w-7 text-white/60" />
+											)}
+										</div>
+									</div>
+
+									<div className="flex-1 min-w-0">
+										<div className="flex items-center justify-between gap-3">
+											<h3 className="text-xl font-semibold text-white tracking-tight group-hover:text-emerald-200 transition-colors font-display">
+												{app.name}
+											</h3>
+											<StatusBadge status={app.status} />
+										</div>
+										<p className="text-sm text-white/60 mt-1 line-clamp-2">
+											{app.description}
+										</p>
+									</div>
 								</div>
-							</div>
 
-							<p className="text-sm text-gray-400 truncate mt-1 font-medium">
-								{app.description}
-							</p>
-
-							<div className="flex items-center gap-3 mt-2 text-xs text-gray-500 font-mono">
-								<span className="bg-white/5 px-2 py-0.5 rounded text-gray-300">
-									v{app.version}
-								</span>
-								<span>{app.size}</span>
-							</div>
-						</div>
-
-						<div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 absolute right-4 bottom-4 md:static md:opacity-100">
-							<button
-								type="button"
-								className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-white transition-colors"
-							>
-								<Download className="w-4 h-4" />
-							</button>
-						</div>
-					</div>
-				</SpotlightCard>
-			))}
+								<div className="flex items-center justify-between gap-4 text-xs text-white/60">
+									<div className="flex items-center gap-3">
+										<span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 font-mono text-[11px] text-white/70">
+											v{app.version}
+										</span>
+										<span className="text-[11px] uppercase tracking-[0.2em]">
+											{app.size}
+										</span>
+									</div>
+									<button
+										type="button"
+										className={`flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] transition-all hover:-translate-y-0.5 ${actionClasses}`}
+									>
+										<ActionIcon className="h-3.5 w-3.5" />
+										{actionLabel}
+									</button>
+								</div>
+							</article>
+						</SpotlightCard>
+					</AnimatedContent>
+				);
+			})}
 		</div>
 	);
 }
@@ -86,17 +91,17 @@ export function StackList({ apps }: { apps: App[] }) {
 function StatusBadge({ status }: { status: string }) {
 	if (status === "Installed") {
 		return (
-			<span className="flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full border border-green-500/20">
-				<CheckCircle2 className="w-3 h-3" />
+			<span className="flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-200">
+				<CheckCircle2 className="h-3 w-3" />
 				Installed
 			</span>
 		);
 	}
 	if (status === "Update Available" || status === "Updated") {
 		return (
-			<span className="flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
-				<RefreshCw className="w-3 h-3" />
-				Update
+			<span className="flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-200">
+				<RefreshCw className="h-3 w-3" />
+				{status === "Updated" ? "Updated" : "Update"}
 			</span>
 		);
 	}
