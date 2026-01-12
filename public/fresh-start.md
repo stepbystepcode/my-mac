@@ -1,15 +1,3 @@
 # Fresh Start Playbook
 
-123
-
-## Stage 01 - Essentials
-
-123
-
-## Stage 02 - Toolchain
-
-123
-
-## Stage 03 - Workflow
-
-123
+Commodo deserunt nulla do et duis Lorem esse reprehenderit quis qui qui elit deserunt cillum. Labore non proident deserunt adipisicing amet in cillum anim. Mollit amet amet et elit enim laboris occaecat consectetur tempor fugiat cillum irure id elit. Dolor enim eiusmod reprehenderit adipisicing cupidatat ut laboris velit minim consectetur Lorem eiusmod.

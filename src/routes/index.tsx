@@ -105,7 +105,7 @@ function App() {
 						</div>
 
 						<p className="mt-8 max-w-2xl text-lg text-white/60 md:text-xl leading-relaxed">
-							Track your applications in a single live catalog pulled straight from your Prisma database.
+							The living blueprint of your perfect macOS environment.
 						</p>
 
 						<div className="mt-10 flex flex-wrap items-center justify-center gap-4">

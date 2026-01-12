@@ -1,6 +1,6 @@
-import { ArrowUpRight, Link2, Terminal, X, Zap } from "lucide-react";
+import { ArrowUpRight, Check, Copy, Link2, Terminal, X, Zap } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import AnimatedContent from "./AnimatedContent";
 import SpotlightCard from "./SpotlightCard";
@@ -20,6 +20,10 @@ export interface AppCard {
 
 export function StackList({ apps }: { apps: AppCard[] }) {
 	const [activeApp, setActiveApp] = useState<AppCard | null>(null);
+	const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">(
+		"idle",
+	);
+	const copyTimeoutRef = useRef<number | null>(null);
 	const canUseDOM = typeof document !== "undefined";
 
 	useEffect(() => {
@@ -41,14 +45,68 @@ export function StackList({ apps }: { apps: AppCard[] }) {
 		};
 	}, [activeApp]);
 
+	useEffect(() => {
+		setCopyStatus("idle");
+		if (copyTimeoutRef.current) {
+			window.clearTimeout(copyTimeoutRef.current);
+			copyTimeoutRef.current = null;
+		}
+	}, [activeApp?.id]);
+
 	const modalCopy = useMemo(() => {
 		if (!activeApp) return null;
 		const summary = activeApp.summary || activeApp.description;
 		const details = activeApp.details || activeApp.description;
 		const isWebLink = activeApp.url.startsWith("http");
+		const command =
+			activeApp.command?.trim() ||
+			(activeApp.kind === "CLI" ? `brew install ${activeApp.name}` : "");
 
-		return { summary, details, isWebLink };
+		return { summary, details, isWebLink, command };
 	}, [activeApp]);
+
+	const handleCopyCommand = async (command: string) => {
+		if (!command) return;
+
+		const fallbackCopy = () => {
+			if (!canUseDOM) return false;
+			try {
+				const textarea = document.createElement("textarea");
+				textarea.value = command;
+				textarea.style.position = "fixed";
+				textarea.style.opacity = "0";
+				document.body.appendChild(textarea);
+				textarea.focus();
+				textarea.select();
+				const success = document.execCommand("copy");
+				document.body.removeChild(textarea);
+				return success;
+			} catch {
+				return false;
+			}
+		};
+
+		try {
+			if (navigator?.clipboard?.writeText) {
+				await navigator.clipboard.writeText(command);
+				setCopyStatus("copied");
+			} else if (fallbackCopy()) {
+				setCopyStatus("copied");
+			} else {
+				setCopyStatus("error");
+			}
+		} catch {
+			setCopyStatus(fallbackCopy() ? "copied" : "error");
+		}
+
+		if (copyTimeoutRef.current) {
+			window.clearTimeout(copyTimeoutRef.current);
+		}
+		copyTimeoutRef.current = window.setTimeout(() => {
+			setCopyStatus("idle");
+			copyTimeoutRef.current = null;
+		}, 1800);
+	};
 
 	return (
 		<>
@@ -193,9 +251,20 @@ export function StackList({ apps }: { apps: AppCard[] }) {
 												>
 													{activeApp.name}
 												</h3>
-												<p className="mt-2 text-sm text-white/60">
-													{modalCopy.summary}
-												</p>
+												<div className="mt-3 flex flex-wrap items-center gap-2">
+													<span
+														className={`rounded-full border px-2 py-1 text-[10px] uppercase tracking-[0.25em] ${
+															activeApp.kind === "CLI"
+																? "border-sky-400/30 text-sky-200/80"
+																: "border-emerald-400/30 text-emerald-200/80"
+														}`}
+													>
+														{activeApp.kind === "CLI" ? "CLI" : "Desktop"}
+													</span>
+													<span className="rounded-full border border-white/10 px-2 py-1 text-[10px] uppercase tracking-[0.25em] text-white/50">
+														{activeApp.category}
+													</span>
+												</div>
 											</div>
 
 											<button
@@ -208,20 +277,86 @@ export function StackList({ apps }: { apps: AppCard[] }) {
 											</button>
 										</div>
 
-										<div className="mt-6 grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-											<div className="space-y-3">
-												<p className="text-[11px] uppercase tracking-[0.35em] text-white/50">
-													Overview
-												</p>
-												<p className="text-sm leading-relaxed text-white/70">
-													{modalCopy.details}
-												</p>
+										<div className="mt-6 grid gap-6 lg:grid-cols-[1.3fr_1fr]">
+											<div className="space-y-6">
+												<div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+													<p className="text-[11px] uppercase tracking-[0.35em] text-white/50">
+														Summary
+													</p>
+													<p className="mt-3 text-sm leading-relaxed text-white/70">
+														{modalCopy.summary}
+													</p>
+												</div>
+
+												<div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+													<p className="text-[11px] uppercase tracking-[0.35em] text-white/50">
+														Details
+													</p>
+													<p className="mt-3 text-sm leading-relaxed text-white/70">
+														{modalCopy.details}
+													</p>
+												</div>
 											</div>
 
 											<div className="space-y-4">
+												{modalCopy.command ? (
+													<div className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4">
+														<div className="flex items-center justify-between gap-3">
+															<p className="text-[11px] uppercase tracking-[0.35em] text-emerald-200/80">
+																Brew Install
+															</p>
+															<button
+																type="button"
+																onClick={() =>
+																	handleCopyCommand(modalCopy.command)
+																}
+																className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 bg-black/40 px-3 py-1 text-[10px] uppercase tracking-[0.25em] text-emerald-100 transition hover:bg-emerald-400/20"
+															>
+																{copyStatus === "copied" ? (
+																	<Check className="h-3.5 w-3.5" />
+																) : (
+																	<Copy className="h-3.5 w-3.5" />
+																)}
+																{copyStatus === "copied"
+																	? "Copied"
+																	: copyStatus === "error"
+																		? "Failed"
+																		: "Copy"}
+															</button>
+														</div>
+														<code className="mt-3 block rounded-xl bg-black/60 px-3 py-2 text-xs text-emerald-50 font-mono">
+															{modalCopy.command}
+														</code>
+													</div>
+												) : null}
+
 												<div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
 													<p className="text-[11px] uppercase tracking-[0.35em] text-white/50">
-														Location
+														Metadata
+													</p>
+													<div className="mt-3 grid gap-3 text-xs text-white/60">
+														<div className="flex items-center justify-between">
+															<span className="uppercase tracking-[0.2em] text-white/40">
+																Type
+															</span>
+															<span className="text-sm text-white/80">
+																{activeApp.kind === "CLI" ? "CLI" : "Desktop"}
+															</span>
+														</div>
+														<div className="flex items-center justify-between">
+															<span className="uppercase tracking-[0.2em] text-white/40">
+																Category
+															</span>
+															<span className="text-sm text-white/80">
+																{activeApp.category}
+															</span>
+														</div>
+													</div>
+												</div>
+
+												<div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+													<p className="text-[11px] uppercase tracking-[0.35em] text-white/50">
+														{modalCopy.isWebLink ? "Source" : "Location"}
 													</p>
 													{modalCopy.isWebLink ? (
 														<a
@@ -239,17 +374,6 @@ export function StackList({ apps }: { apps: AppCard[] }) {
 														</p>
 													)}
 												</div>
-
-												{activeApp.command ? (
-													<div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-														<p className="text-[11px] uppercase tracking-[0.35em] text-white/50">
-															Install Command
-														</p>
-														<code className="mt-2 block rounded-xl bg-black/60 px-3 py-2 text-xs text-emerald-100 font-mono">
-															{activeApp.command}
-														</code>
-													</div>
-												) : null}
 											</div>
 										</div>
 									</motion.div>
