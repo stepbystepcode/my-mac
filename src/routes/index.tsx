@@ -148,16 +148,18 @@ function App() {
 									</p>
 								</div>
 
-								<div className="relative flex flex-wrap items-center gap-2 rounded-full border border-white/10 bg-black/30 p-1">
+								<div className="relative flex flex-nowrap items-center gap-1 rounded-full border border-white/10 bg-black/30 p-1 sm:gap-2">
 									{[
 										{
 											id: "desktop",
 											label: "Desktop",
+											mobileLabel: "Desktop",
 											count: desktopApps.length,
 										},
 										{
 											id: "cli",
 											label: "Command Line",
+											mobileLabel: "CLI",
 											count: cliApps.length,
 										},
 									].map((tab) => (
@@ -167,7 +169,7 @@ function App() {
 											onClick={() =>
 												setActiveTab(tab.id as "desktop" | "cli")
 											}
-											className={`group relative inline-flex items-center gap-2 rounded-full px-4 py-2 text-[11px] uppercase tracking-[0.25em] transition-colors ${
+											className={`group relative inline-flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-2 text-[10px] uppercase tracking-[0.2em] transition-colors sm:gap-2 sm:px-4 sm:text-[11px] sm:tracking-[0.25em] ${
 												activeTab === tab.id
 													? "text-white"
 													: "text-white/50 hover:text-white"
@@ -184,7 +186,10 @@ function App() {
 													}}
 												/>
 											) : null}
-											<span className="relative z-10">{tab.label}</span>
+											<span className="relative z-10">
+												<span className="sm:hidden">{tab.mobileLabel}</span>
+												<span className="hidden sm:inline">{tab.label}</span>
+											</span>
 											<span
 												className={`relative z-10 rounded-full px-2 py-0.5 text-[10px] transition-colors ${
 													activeTab === tab.id
