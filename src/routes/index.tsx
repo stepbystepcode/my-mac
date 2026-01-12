@@ -27,15 +27,33 @@ function App() {
 	} = Route.useLoaderData();
 	const [activeTab, setActiveTab] = useState<"desktop" | "cli">("desktop");
 
-	const { desktopApps, cliApps, visibleApps } = useMemo(() => {
-		const desktop = apps.filter((app) => app.kind !== "CLI");
-		const cli = apps.filter((app) => app.kind === "CLI");
-		return {
-			desktopApps: desktop,
-			cliApps: cli,
-			visibleApps: activeTab === "cli" ? cli : desktop,
-		};
-	}, [activeTab, apps]);
+	const normalizedApps = useMemo(() => {
+		return apps.map((app) => {
+			const rawKind =
+				typeof app.kind === "string" ? app.kind.toUpperCase() : "";
+			if (rawKind === "CLI" || rawKind === "GUI") {
+				return { ...app, kind: rawKind };
+			}
+
+			const inferredCli =
+				Boolean(app.command) ||
+				(typeof app.category === "string" &&
+					app.category.toLowerCase() === "homebrew") ||
+				(typeof app.url === "string" && app.url.startsWith("http"));
+
+			return { ...app, kind: inferredCli ? "CLI" : "GUI" };
+		});
+	}, [apps]);
+
+	const desktopApps = useMemo(
+		() => normalizedApps.filter((app) => app.kind !== "CLI"),
+		[normalizedApps],
+	);
+	const cliApps = useMemo(
+		() => normalizedApps.filter((app) => app.kind === "CLI"),
+		[normalizedApps],
+	);
+	const visibleApps = activeTab === "cli" ? cliApps : desktopApps;
 
 	useEffect(() => {
 		if (activeTab === "desktop" && desktopApps.length === 0 && cliApps.length > 0) {

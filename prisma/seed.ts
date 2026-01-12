@@ -21,6 +21,15 @@ const APP_ROOTS = ['/Applications', path.join(os.homedir(), 'Applications')]
 
 type AppKind = 'GUI' | 'CLI'
 
+const EXCLUDED_BUNDLE_IDS = new Set<string>([
+  'com.eagleyun.sase',
+  'com.tal.yach.mac',
+])
+
+const EXCLUDED_BREW_FORMULAE = new Set<string>([
+  // 'node',
+])
+
 type AppSeed = {
   name: string
   description: string
@@ -34,6 +43,9 @@ type AppSeed = {
 }
 
 type PlistRecord = Record<string, unknown>
+
+const isRecord = (value: unknown): value is PlistRecord =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
 
 const plistString = (plist: PlistRecord | null, key: string) => {
   if (!plist) return undefined
@@ -49,6 +61,18 @@ const pickPlistString = (plist: PlistRecord | null, keys: string[]) => {
     if (value) return value
   }
   return undefined
+}
+
+const plistObject = (plist: PlistRecord | null, key: string) => {
+  if (!plist) return null
+  const value = plist[key]
+  return isRecord(value) ? value : null
+}
+
+const plistArray = (plist: PlistRecord | null, key: string) => {
+  if (!plist) return null
+  const value = plist[key]
+  return Array.isArray(value) ? value : null
 }
 
 const readPlist = async (plistPath: string) => {
@@ -102,12 +126,126 @@ const isSystemApp = (bundleId: string | undefined, appPath: string) => {
   return bundleId === 'com.apple' || bundleId.startsWith('com.apple.')
 }
 
+const resolveIconCandidates = (plist: PlistRecord | null) => {
+  const candidates: string[] = []
+  const iconFile = plistString(plist, 'CFBundleIconFile')
+  if (iconFile) candidates.push(iconFile)
+
+  const iconName = plistString(plist, 'CFBundleIconName')
+  if (iconName) candidates.push(iconName)
+
+  const icons = plistObject(plist, 'CFBundleIcons')
+  const primary = plistObject(icons, 'CFBundlePrimaryIcon')
+  const iconFiles = plistArray(primary, 'CFBundleIconFiles')
+  if (iconFiles) {
+    for (const value of iconFiles) {
+      if (typeof value === 'string') candidates.push(value)
+    }
+  }
+  const primaryName = plistString(primary, 'CFBundleIconName')
+  if (primaryName) candidates.push(primaryName)
+
+  return candidates
+}
+
+const resolveIcnsPath = async (appPath: string, plist: PlistRecord | null) => {
+  const resourcesDir = path.join(appPath, 'Contents', 'Resources')
+  const candidates = resolveIconCandidates(plist)
+  const candidatePaths = candidates.flatMap((name) => {
+    const hasIcns = name.toLowerCase().endsWith('.icns')
+    const withExt = hasIcns ? [name] : [name, `${name}.icns`]
+    return withExt.map((iconName) => path.join(resourcesDir, iconName))
+  })
+
+  for (const candidate of candidatePaths) {
+    try {
+      const stat = await fs.stat(candidate)
+      if (stat.isFile()) return candidate
+    } catch {
+      continue
+    }
+  }
+
+  try {
+    const entries = await fs.readdir(resourcesDir, { withFileTypes: true })
+    const icnsEntries = entries.filter(
+      (entry) =>
+        entry.isFile() && entry.name.toLowerCase().endsWith('.icns'),
+    )
+
+    if (icnsEntries.length === 0) return null
+
+    const appIconEntry = icnsEntries.find((entry) =>
+      entry.name.toLowerCase().includes('appicon'),
+    )
+    if (appIconEntry) return path.join(resourcesDir, appIconEntry.name)
+
+    const bySize = await Promise.all(
+      icnsEntries.map(async (entry) => {
+        const fullPath = path.join(resourcesDir, entry.name)
+        try {
+          const stat = await fs.stat(fullPath)
+          return { path: fullPath, size: stat.size }
+        } catch {
+          return { path: fullPath, size: 0 }
+        }
+      }),
+    )
+    bySize.sort((a, b) => b.size - a.size)
+    return bySize[0]?.path ?? null
+  } catch {
+    return null
+  }
+}
+
+const icnsToBase64 = async (icnsPath: string) => {
+  let tempDir: string | null = null
+  try {
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'icns-'))
+    const outputPath = path.join(tempDir, 'icon.png')
+    await execFileAsync('sips', [
+      '-s',
+      'format',
+      'png',
+      '-s',
+      'formatOptions',
+      'best',
+      '--resampleHeightWidthMax',
+      '1024',
+      icnsPath,
+      '--out',
+      outputPath,
+    ])
+    const data = await fs.readFile(outputPath)
+    return `data:image/png;base64,${data.toString('base64')}`
+  } catch {
+    return ''
+  } finally {
+    if (tempDir) {
+      await fs.rm(tempDir, { recursive: true, force: true })
+    }
+  }
+}
+
+const iconCache = new Map<string, string>()
+
+const getAppIcon = async (appPath: string, plist: PlistRecord | null) => {
+  const iconPath = await resolveIcnsPath(appPath, plist)
+  if (!iconPath) return ''
+  const cached = iconCache.get(iconPath)
+  if (cached) return cached
+  const base64 = await icnsToBase64(iconPath)
+  if (base64) iconCache.set(iconPath, base64)
+  return base64
+}
+
 const readAppInfo = async (appPath: string) => {
   const plistPath = path.join(appPath, 'Contents', 'Info.plist')
   const plist = await readPlist(plistPath)
   if (!plist) return null
 
   const bundleId = plistString(plist, 'CFBundleIdentifier')
+  if (bundleId && EXCLUDED_BUNDLE_IDS.has(bundleId)) return null
   if (isSystemApp(bundleId, appPath)) return null
 
   const name =
@@ -122,10 +260,13 @@ const readAppInfo = async (appPath: string) => {
     bundleId ||
     `${name} app`
 
+  const icon = await getAppIcon(appPath, plist)
+
   return {
     name,
     description,
     summary: description,
+    icon,
     url: pathToFileURL(appPath).toString(),
   }
 }
@@ -207,12 +348,103 @@ const cliApps: AppSeed[] = [
   },
 ]
 
+const resolveBrewPath = async () => {
+  const candidates = [
+    process.env.HOMEBREW_BREW,
+    process.env.BREW_BIN,
+    '/opt/homebrew/bin/brew',
+    '/usr/local/bin/brew',
+  ].filter(Boolean) as string[]
+
+  for (const candidate of candidates) {
+    try {
+      const stat = await fs.stat(candidate)
+      if (stat.isFile()) return candidate
+    } catch {
+      continue
+    }
+  }
+
+  return 'brew'
+}
+
+const buildBrewEnv = () => {
+  const fallbackPaths = ['/opt/homebrew/bin', '/usr/local/bin']
+  const currentPath = process.env.PATH || ''
+  const merged = [currentPath, ...fallbackPaths]
+    .filter(Boolean)
+    .join(':')
+  return {
+    ...process.env,
+    HOMEBREW_NO_AUTO_UPDATE: process.env.HOMEBREW_NO_AUTO_UPDATE ?? '1',
+    PATH: merged,
+  }
+}
+
+type BrewFormula = {
+  name?: string
+  desc?: string | null
+  homepage?: string | null
+  tap?: string | null
+  installed?: unknown[]
+}
+
+const loadBrewCliApps = async (): Promise<AppSeed[]> => {
+  try {
+    const brewPath = await resolveBrewPath()
+    const { stdout } = await execFileAsync(
+      brewPath,
+      ['info', '--json=v2', '--installed'],
+      { env: buildBrewEnv(), maxBuffer: 1024 * 1024 * 50 },
+    )
+    const output = typeof stdout === 'string' ? stdout : stdout.toString('utf8')
+    const trimmed = output.trim()
+    const start = trimmed.indexOf('{')
+    const end = trimmed.lastIndexOf('}')
+    const jsonPayload =
+      start >= 0 && end >= 0 ? trimmed.slice(start, end + 1) : trimmed
+    const data = JSON.parse(jsonPayload) as { formulae?: BrewFormula[] }
+    const formulae = Array.isArray(data.formulae) ? data.formulae : []
+    const curatedNames = new Set(cliApps.map((app) => app.name))
+
+    return formulae
+      .filter((formula) => Boolean(formula.name))
+      .map((formula) => {
+        const name = formula.name as string
+        return {
+          name,
+          description: formula.desc || `${name} command-line tool.`,
+          summary: formula.desc || `${name} command-line tool.`,
+          details: formula.desc
+            ? `${formula.desc} Installed via Homebrew.`
+            : 'Installed via Homebrew.',
+          icon: '',
+          url:
+            formula.homepage ||
+            `https://formulae.brew.sh/formula/${encodeURIComponent(name)}`,
+          kind: 'CLI' as const,
+          category: formula.tap?.split('/').pop() || 'Homebrew',
+          command: `brew install ${name}`,
+        }
+      })
+      .filter((app) => !EXCLUDED_BREW_FORMULAE.has(app.name))
+      .filter((app) => !curatedNames.has(app.name))
+  } catch {
+    return []
+  }
+}
+
 async function main() {
   console.log('🌱 Seeding database...')
 
   await prisma.app.deleteMany()
 
-  const appData: AppSeed[] = [...cliApps]
+  const brewApps = await loadBrewCliApps()
+  const appData: AppSeed[] = [...brewApps]
+
+  if (process.env.SEED_INCLUDE_SAMPLE_CLI === 'true') {
+    appData.push(...cliApps)
+  }
 
   if (process.platform !== 'darwin') {
     console.log('Skipping app discovery: this seed script expects macOS.')
@@ -245,7 +477,7 @@ async function main() {
         description: info.description,
         summary: info.summary,
         details: `${info.description} Indexed from your Applications folder for your local library.`,
-        icon: '',
+        icon: info.icon,
         url: info.url,
         kind: 'GUI',
         category: GUI_CATEGORY,
