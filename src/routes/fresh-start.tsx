@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
+import MarkdownIt from "markdown-it";
+import { useEffect, useMemo, useState } from "react";
 
 import AnimatedContent from "../components/AnimatedContent";
 import Header from "../components/Header";
 import LightRays from "../components/LightRays";
 import Noise from "../components/Noise";
-import SpotlightCard from "../components/SpotlightCard";
 
 const navItems = [
 	{ label: "Overview", ariaLabel: "Overview", link: "/#overview" },
@@ -13,26 +14,50 @@ const navItems = [
 	{ label: "Fresh Start", ariaLabel: "Fresh Start", link: "/fresh-start" },
 ];
 
-const guideSteps = [
-	{
-		title: "Stage 01 - Essentials",
-		body: "123",
-	},
-	{
-		title: "Stage 02 - Toolchain",
-		body: "123",
-	},
-	{
-		title: "Stage 03 - Workflow",
-		body: "123",
-	},
-];
+const markdownUrl = "/fresh-start.md";
 
 export const Route = createFileRoute("/fresh-start")({
 	component: FreshStartPage,
 });
 
 function FreshStartPage() {
+	const markdown = useMemo(
+		() =>
+			new MarkdownIt({
+				html: false,
+				linkify: true,
+				typographer: true,
+			}),
+		[],
+	);
+	const [markdownHtml, setMarkdownHtml] = useState<string>("");
+	const [loadError, setLoadError] = useState<string | null>(null);
+
+	useEffect(() => {
+		const controller = new AbortController();
+
+		const loadMarkdown = async () => {
+			try {
+				const response = await fetch(markdownUrl, {
+					signal: controller.signal,
+				});
+				if (!response.ok) {
+					throw new Error("Failed to load markdown.");
+				}
+				const text = await response.text();
+				setMarkdownHtml(markdown.render(text));
+				setLoadError(null);
+			} catch (error) {
+				if ((error as Error).name === "AbortError") return;
+				setLoadError("Unable to load the onboarding guide right now.");
+			}
+		};
+
+		loadMarkdown();
+
+		return () => controller.abort();
+	}, [markdown]);
+
 	return (
 		<div className="relative isolate min-h-screen overflow-hidden bg-[#040607] text-white selection:bg-emerald-300/30">
 			<LightRays
@@ -48,48 +73,18 @@ function FreshStartPage() {
 				<section className="flex flex-col gap-6">
 					<AnimatedContent distance={30} duration={0.8}>
 						<div className="rounded-[28px] border border-white/10 bg-white/[0.04] p-8 backdrop-blur-xl">
-							<p className="text-xs uppercase tracking-[0.4em] text-emerald-200/80">
-								Onboarding
-							</p>
-							<h1 className="mt-3 font-display text-4xl text-white md:text-5xl">
-								Fresh Start Playbook
-							</h1>
-							<p className="mt-4 max-w-2xl text-sm leading-relaxed text-white/60">
-								123
-							</p>
+							{loadError ? (
+								<p className="text-sm text-white/60">{loadError}</p>
+							) : markdownHtml ? (
+								<div
+									className="markdown-body text-white/70"
+									dangerouslySetInnerHTML={{ __html: markdownHtml }}
+								/>
+							) : (
+								<p className="text-sm text-white/60">Loading guide...</p>
+							)}
 						</div>
 					</AnimatedContent>
-				</section>
-
-				<section className="space-y-6">
-					<AnimatedContent distance={24} duration={0.7}>
-						<div className="flex items-end justify-between">
-							<div>
-								<p className="text-xs uppercase tracking-[0.35em] text-white/50">
-									Guide
-								</p>
-								<h2 className="font-display text-2xl text-white md:text-3xl">
-									From zero to productive
-								</h2>
-							</div>
-						</div>
-					</AnimatedContent>
-
-					<div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-						{guideSteps.map((step) => (
-							<SpotlightCard
-								key={step.title}
-								className="border-white/10 bg-gradient-to-br from-white/[0.06] via-white/[0.02] to-transparent shadow-[0_24px_60px_-40px_rgba(0,0,0,0.9)]"
-							>
-								<div className="flex h-full flex-col gap-3 p-5">
-									<p className="text-[11px] uppercase tracking-[0.35em] text-emerald-200/70">
-										{step.title}
-									</p>
-									<p className="text-sm text-white/60">{step.body}</p>
-								</div>
-							</SpotlightCard>
-						))}
-					</div>
 				</section>
 			</main>
 		</div>

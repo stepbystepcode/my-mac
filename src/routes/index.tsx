@@ -96,7 +96,7 @@ function App() {
 							<div className="pointer-events-none absolute -bottom-20 -right-20 h-64 w-64 rounded-full bg-sky-500/10 blur-[120px]" />
 							
 							<BlurText
-								text="My Mac Apps"
+								text="Awesome Mac"
 								animateBy="letters"
 								direction="bottom"
 								delay={200}
