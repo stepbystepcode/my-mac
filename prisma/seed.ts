@@ -19,6 +19,20 @@ const prisma = new PrismaClient({ adapter })
 
 const APP_ROOTS = ['/Applications', path.join(os.homedir(), 'Applications')]
 
+type AppKind = 'GUI' | 'CLI'
+
+type AppSeed = {
+  name: string
+  description: string
+  icon: string
+  url: string
+  kind: AppKind
+  category: string
+  summary: string
+  details: string
+  command?: string | null
+}
+
 type PlistRecord = Record<string, unknown>
 
 const plistString = (plist: PlistRecord | null, key: string) => {
@@ -111,59 +125,137 @@ const readAppInfo = async (appPath: string) => {
   return {
     name,
     description,
+    summary: description,
     url: pathToFileURL(appPath).toString(),
   }
 }
+
+const GUI_CATEGORY = 'Desktop'
+
+const cliApps: AppSeed[] = [
+  {
+    name: 'ripgrep',
+    description: 'Fast line-oriented search tool.',
+    summary: 'Lightning-fast regex search for large codebases.',
+    details:
+      'ripgrep combines rip, grep, and ack features with incredible speed and sensible defaults for code search.',
+    icon: '',
+    url: 'https://github.com/BurntSushi/ripgrep',
+    kind: 'CLI',
+    category: 'Search',
+    command: 'brew install ripgrep',
+  },
+  {
+    name: 'fzf',
+    description: 'Command-line fuzzy finder.',
+    summary: 'Interactive fuzzy search for files, history, and commands.',
+    details:
+      'fzf adds fuzzy selection to your shell and tools, making it effortless to navigate large lists.',
+    icon: '',
+    url: 'https://github.com/junegunn/fzf',
+    kind: 'CLI',
+    category: 'Productivity',
+    command: 'brew install fzf',
+  },
+  {
+    name: 'bat',
+    description: 'A cat clone with syntax highlighting.',
+    summary: 'Readable file previews with themes and line numbers.',
+    details:
+      'bat improves on cat with syntax highlighting, git integration, and a sleek default theme.',
+    icon: '',
+    url: 'https://github.com/sharkdp/bat',
+    kind: 'CLI',
+    category: 'Utilities',
+    command: 'brew install bat',
+  },
+  {
+    name: 'fd',
+    description: 'A simple, fast alternative to find.',
+    summary: 'Fast file search with sensible defaults.',
+    details:
+      'fd offers a modern take on find with smart ignores, colorized output, and simple syntax.',
+    icon: '',
+    url: 'https://github.com/sharkdp/fd',
+    kind: 'CLI',
+    category: 'Utilities',
+    command: 'brew install fd',
+  },
+  {
+    name: 'jq',
+    description: 'Command-line JSON processor.',
+    summary: 'Slice, transform, and format JSON with ease.',
+    details:
+      'jq is a lightweight and flexible command-line JSON processor for filtering and transforming data.',
+    icon: '',
+    url: 'https://stedolan.github.io/jq/',
+    kind: 'CLI',
+    category: 'Data',
+    command: 'brew install jq',
+  },
+  {
+    name: 'gh',
+    description: 'GitHub command-line interface.',
+    summary: 'Work with GitHub pull requests, issues, and releases.',
+    details:
+      'gh brings GitHub to your terminal with streamlined workflows for PRs, reviews, and repo management.',
+    icon: '',
+    url: 'https://cli.github.com/',
+    kind: 'CLI',
+    category: 'Developer Tools',
+    command: 'brew install gh',
+  },
+]
 
 async function main() {
   console.log('🌱 Seeding database...')
 
   await prisma.app.deleteMany()
 
+  const appData: AppSeed[] = [...cliApps]
+
   if (process.platform !== 'darwin') {
     console.log('Skipping app discovery: this seed script expects macOS.')
-    return
-  }
+  } else {
+    const seen = new Set<string>()
+    const appPaths: string[] = []
 
-  const seen = new Set<string>()
-  const appPaths: string[] = []
+    for (const root of APP_ROOTS) {
+      try {
+        const stat = await fs.stat(root)
+        if (!stat.isDirectory()) continue
+      } catch {
+        continue
+      }
 
-  for (const root of APP_ROOTS) {
-    try {
-      const stat = await fs.stat(root)
-      if (!stat.isDirectory()) continue
-    } catch {
-      continue
+      const bundles = await listAppBundles(root)
+      for (const bundle of bundles) {
+        if (seen.has(bundle)) continue
+        seen.add(bundle)
+        appPaths.push(bundle)
+      }
     }
 
-    const bundles = await listAppBundles(root)
-    for (const bundle of bundles) {
-      if (seen.has(bundle)) continue
-      seen.add(bundle)
-      appPaths.push(bundle)
+    for (const appPath of appPaths) {
+      const info = await readAppInfo(appPath)
+      if (!info) continue
+
+      appData.push({
+        name: info.name,
+        description: info.description,
+        summary: info.summary,
+        details: `${info.description} Indexed from your Applications folder for your local library.`,
+        icon: '',
+        url: info.url,
+        kind: 'GUI',
+        category: GUI_CATEGORY,
+        command: null,
+      })
     }
-  }
-
-  const appData: Array<{
-    name: string
-    description: string
-    icon: string
-    url: string
-  }> = []
-  for (const appPath of appPaths) {
-    const info = await readAppInfo(appPath)
-    if (!info) continue
-
-    appData.push({
-      name: info.name,
-      description: info.description,
-      icon: '',
-      url: info.url,
-    })
   }
 
   if (appData.length === 0) {
-    console.log('No non-system apps found to seed.')
+    console.log('No apps found to seed.')
     return
   }
 

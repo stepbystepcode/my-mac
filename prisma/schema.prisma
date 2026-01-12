@@ -12,4 +12,14 @@ model App {
   description String
   icon        String
   url         String
+  kind        AppKind  @default(GUI)
+  category    String   @default("Desktop")
+  summary     String   @default("")
+  details     String   @default("")
+  command     String?
+}
+
+enum AppKind {
+  GUI
+  CLI
 }
