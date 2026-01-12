@@ -1,7 +1,3 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
-import { createServerFn } from "@tanstack/react-start";
-
 type AppRecord = {
 	id: number;
 	name: string;
@@ -15,52 +11,54 @@ type AppRecord = {
 	command?: string | null;
 };
 
-const appsJsonPath = path.join(process.cwd(), "public", "apps.json");
+const appsJsonUrl = "/apps.json";
 
 const loadApps = async (): Promise<AppRecord[]> => {
 	try {
-		const raw = await fs.readFile(appsJsonPath, "utf8");
-		const parsed = JSON.parse(raw);
-		if (!Array.isArray(parsed)) return [];
-		return parsed as AppRecord[];
+		const response = await fetch(appsJsonUrl, {
+			cache: "no-store",
+		});
+		if (!response.ok) {
+			return [];
+		}
+		const parsed = (await response.json()) as unknown;
+		return Array.isArray(parsed) ? (parsed as AppRecord[]) : [];
 	} catch {
 		return [];
 	}
 };
 
-export const getAppsData = createServerFn({ method: "GET" }).handler(
-	async () => {
-		const apps = await loadApps();
-		apps.sort((a, b) => a.name.localeCompare(b.name));
+export const getAppsData = async () => {
+	const apps = await loadApps();
+	apps.sort((a, b) => a.name.localeCompare(b.name));
 
-		const logoItems = apps
-			.filter((app) => app.icon)
-			.slice(0, 12)
-			.map((app) => ({
-				src: app.icon,
-				alt: app.name,
-				title: app.name,
-			}));
+	const logoItems = apps
+		.filter((app) => app.icon)
+		.slice(0, 12)
+		.map((app) => ({
+			src: app.icon,
+			alt: app.name,
+			title: app.name,
+		}));
 
-		const menuItems = [
-			{ label: "Overview", ariaLabel: "Overview", link: "#overview" },
-			{
-				label: `Library (${apps.length})`,
-				ariaLabel: "Library",
-				link: "#library",
-			},
-			{ label: "Config", ariaLabel: "Config", link: "/config" },
-			{
-				label: "Fresh Start",
-				ariaLabel: "Fresh Start",
-				link: "/fresh-start",
-			},
-		];
+	const menuItems = [
+		{ label: "Overview", ariaLabel: "Overview", link: "#overview" },
+		{
+			label: `Library (${apps.length})`,
+			ariaLabel: "Library",
+			link: "#library",
+		},
+		{ label: "Config", ariaLabel: "Config", link: "/config" },
+		{
+			label: "Fresh Start",
+			ariaLabel: "Fresh Start",
+			link: "/fresh-start",
+		},
+	];
 
-		return {
-			apps,
-			logoItems,
-			menuItems,
-		};
-	},
-);
+	return {
+		apps,
+		logoItems,
+		menuItems,
+	};
+};
