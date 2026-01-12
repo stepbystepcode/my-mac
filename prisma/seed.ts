@@ -437,8 +437,6 @@ const loadBrewCliApps = async (): Promise<AppSeed[]> => {
 async function main() {
   console.log('🌱 Seeding database...')
 
-  await prisma.app.deleteMany()
-
   const brewApps = await loadBrewCliApps()
   const appData: AppSeed[] = [...brewApps]
 
@@ -491,11 +489,65 @@ async function main() {
     return
   }
 
-  const apps = await prisma.app.createMany({
-    data: appData,
+  const existingApps = await prisma.app.findMany({
+    select: {
+      id: true,
+      url: true,
+    },
   })
 
-  console.log(`✅ Created ${apps.count} apps`)
+  const existingByUrl = new Map<string, { id: number }>()
+  for (const app of existingApps) {
+    if (!existingByUrl.has(app.url)) {
+      existingByUrl.set(app.url, { id: app.id })
+    }
+  }
+
+  let created = 0
+  let updated = 0
+  let skipped = 0
+  const seenUrls = new Set<string>()
+
+  for (const app of appData) {
+    if (seenUrls.has(app.url)) {
+      skipped += 1
+      continue
+    }
+    seenUrls.add(app.url)
+
+    const existing = existingByUrl.get(app.url)
+    const updateData = {
+      name: app.name,
+      description: app.description,
+      url: app.url,
+      kind: app.kind,
+      category: app.category,
+      summary: app.summary,
+      details: app.details,
+      command: app.command ?? null,
+      ...(app.icon ? { icon: app.icon } : {}),
+    }
+
+    if (existing) {
+      await prisma.app.update({
+        where: { id: existing.id },
+        data: updateData,
+      })
+      updated += 1
+    } else {
+      await prisma.app.create({
+        data: {
+          ...updateData,
+          icon: app.icon,
+        },
+      })
+      created += 1
+    }
+  }
+
+  console.log(
+    `✅ Seeded apps: ${created} created, ${updated} updated, ${skipped} skipped`,
+  )
 }
 
 main()

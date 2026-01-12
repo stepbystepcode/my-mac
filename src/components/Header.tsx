@@ -13,11 +13,11 @@ export default function Header({
 		<div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-6 rounded-full border border-white/10 bg-black/20 px-6 py-3 backdrop-blur-md shadow-lg shadow-black/10">
 			<a href="/" className="flex items-center gap-2 transition-opacity hover:opacity-80">
 				<img 
-					src={logoUrl || "/logo192.png"} 
+					src={logoUrl || "/mac.svg"} 
 					alt="Logo" 
-					className="h-6 w-auto object-contain"
+					className="h-6 w-auto object-contain brightness-0 invert"
 				/>
-				<span className="font-display font-medium text-white">React Bits</span>
+				<span className="font-display font-medium text-white">Awesome Mac</span>
 			</a>
 			
 			<nav className="flex items-center gap-6">

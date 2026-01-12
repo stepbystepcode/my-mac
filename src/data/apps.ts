@@ -23,15 +23,18 @@ export const getAppsData = createServerFn({ method: "GET" }).handler(
 				ariaLabel: "Library",
 				link: "#library",
 			},
+			{ label: "Config", ariaLabel: "Config", link: "/config" },
+			{
+				label: "Fresh Start",
+				ariaLabel: "Fresh Start",
+				link: "/fresh-start",
+			},
 		];
-
-		const logoUrl = apps.find((app) => app.icon)?.icon || "/logo192.png";
 
 		return {
 			apps,
 			logoItems,
 			menuItems,
-			logoUrl,
 		};
 	},
 );

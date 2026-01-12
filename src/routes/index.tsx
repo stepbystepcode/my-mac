@@ -23,7 +23,6 @@ function App() {
 	const {
 		apps,
 		menuItems,
-		logoUrl,
 	} = Route.useLoaderData();
 	const [activeTab, setActiveTab] = useState<"desktop" | "cli">("desktop");
 
@@ -72,7 +71,7 @@ function App() {
 
 			<Header
 				items={menuItems}
-				logoUrl={logoUrl}
+				logoUrl="/mac.svg"
 			/>
 
 			<main className="relative z-30 mx-auto flex w-full max-w-6xl flex-col gap-16 px-6 pb-24 pt-28">
@@ -149,7 +148,7 @@ function App() {
 									</p>
 								</div>
 
-								<div className="flex flex-wrap items-center gap-2 rounded-full border border-white/10 bg-black/30 p-1">
+								<div className="relative flex flex-wrap items-center gap-2 rounded-full border border-white/10 bg-black/30 p-1">
 									{[
 										{
 											id: "desktop",
@@ -168,14 +167,31 @@ function App() {
 											onClick={() =>
 												setActiveTab(tab.id as "desktop" | "cli")
 											}
-											className={`flex items-center gap-2 rounded-full px-4 py-2 text-[11px] uppercase tracking-[0.25em] transition ${
+											className={`group relative inline-flex items-center gap-2 rounded-full px-4 py-2 text-[11px] uppercase tracking-[0.25em] transition-colors ${
 												activeTab === tab.id
-													? "bg-white/10 text-white"
+													? "text-white"
 													: "text-white/50 hover:text-white"
 											}`}
 										>
-											<span>{tab.label}</span>
-											<span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-white/70">
+											{activeTab === tab.id ? (
+												<motion.span
+													layoutId="library-tab-indicator"
+													className="absolute inset-0 rounded-full bg-white/10 shadow-[0_18px_40px_-30px_rgba(255,255,255,0.8)]"
+													transition={{
+														type: "spring",
+														stiffness: 260,
+														damping: 22,
+													}}
+												/>
+											) : null}
+											<span className="relative z-10">{tab.label}</span>
+											<span
+												className={`relative z-10 rounded-full px-2 py-0.5 text-[10px] transition-colors ${
+													activeTab === tab.id
+														? "bg-white/20 text-white/80"
+														: "bg-white/10 text-white/50 group-hover:text-white/70"
+												}`}
+											>
 												{tab.count}
 											</span>
 										</button>
